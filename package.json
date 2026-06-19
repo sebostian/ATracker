@@ -1,0 +1,30 @@
+{
+  "name": "atracker",
+  "version": "0.1.0",
+  "description": "Cross-platform activity tracker that pops a native dialog once per interval and reports where your time went.",
+  "type": "module",
+  "bin": {
+    "atracker": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "tsx --test src/**/*.test.ts",
+    "prepare": "tsc",
+    "prepublishOnly": "tsc"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
