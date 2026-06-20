@@ -9,6 +9,7 @@ import {
   readRecordsForRange,
 } from "./storage.js";
 import { buildReport, formatReport, formatWeeklyReport } from "./report.js";
+import { installAutostart } from "./install.js";
 import type { ActivityRecord } from "./types.js";
 
 /** Build an ISO timestamp for now, or for today at `HH:MM` if `--time` was given. */
@@ -76,6 +77,11 @@ program
       console.log(out || "Нет записей.");
     }
   });
+
+program
+  .command("install")
+  .description("Зарегистрировать автозапуск при входе в систему")
+  .action(() => installAutostart());
 
 // Hidden entry point for the detached child spawned by `start` — runs the loop.
 program
