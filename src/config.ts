@@ -27,7 +27,7 @@ export const DEFAULT_CONFIG: Config = {
 };
 
 /** Create `~/.atracker/` if it doesn't exist. */
-function ensureDataDir(): void {
+export function ensureDataDir(): void {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
