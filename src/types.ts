@@ -41,8 +41,9 @@ export interface Config {
 }
 
 /**
- * Report-only display kinds. A rendered slot may show one of the persisted
- * statuses, or one of these two interpreted-at-render states:
+ * The statuses a *rendered* report slot can have. Note `dismissed` is absent: the
+ * report layer never emits it — it converts a dismissed record into `copied`.
+ * The two render-only states added on top of the persisted ones:
  *
  * - `copied` — a `dismissed` slot displaying the previous slot's activity
  *              ("← скопировано").
@@ -51,13 +52,13 @@ export interface Config {
  *
  * These NEVER appear in storage — they exist purely in `report.ts` output.
  */
-export type DisplayStatus = ActivityStatus | "copied" | "absent";
+export type RenderStatus = Exclude<ActivityStatus, "dismissed"> | "copied" | "absent";
 
 /** A single rendered line in a report. */
 export interface ReportSlot {
   /** ISO 8601 timestamp of the slot. */
   timestamp: string;
-  status: DisplayStatus;
+  status: RenderStatus;
   /** Resolved activity text to show (carried forward for `copied`). */
   activity?: string;
 }
