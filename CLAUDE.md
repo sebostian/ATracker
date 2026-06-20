@@ -8,15 +8,23 @@ Save all plans in the `know/` folder (e.g. `know/plan_02.md`), following the exi
 
 ## Project status
 
-This repository currently contains **only a design spec** at `know/plan_01.md` (in Russian) — there is no source code, `package.json`, or build tooling yet. The plan is the source of truth for the architecture below; implement against it.
+The CLI is **implemented** (Steps 0–10 of `know/plan_02.md`). Source lives under `src/`, with unit tests in `tests/`. The original Russian design spec is `know/plan_01.md` and the phased build plan is `know/plan_02.md` — both remain the source of truth for intended behaviour.
+
+## Build & test
+
+- `npm install` — install deps.
+- `npm run build` — compile TypeScript to `dist/` (`tsc`).
+- `npm run dev -- <args>` — run the CLI from source via `tsx` (e.g. `npm run dev -- report`).
+- `npm test` — run unit tests (`node:test` via `tsx`); tests live in **`tests/`**, never alongside `src/`.
+- `npm link` — expose the global `atracker` binary.
 
 ## What ATracker is
 
 A small cross-platform (macOS + Windows) CLI that runs as a detached background process. Once per interval it pops a **native OS dialog** asking "Что ты делал последний час?" ("What were you doing the last hour?"), appends the answer to a log, and can render a daily/weekly report of where time went.
 
-## Planned dependencies & commands
+## Dependencies & commands
 
-Per the spec, the only runtime deps are `commander` (CLI) and `tsx` (run TypeScript directly); everything else uses Node built-ins. Once implemented, the CLI surface is:
+The only runtime dependency is `commander` (CLI); everything else uses Node built-ins. `tsx`, `typescript`, and `@types/node` are devDependencies. The CLI surface:
 
 - `atracker start` — spawn the detached daemon (refuses if already running)
 - `atracker stop` — kill the daemon, remove state file
@@ -24,14 +32,17 @@ Per the spec, the only runtime deps are `commander` (CLI) and `tsx` (run TypeScr
 - `atracker report [--date YYYY-MM-DD | --week]` — today / specific date / last 7 days
 - `atracker install` — register autostart (macOS LaunchAgent via `launchctl`; Windows task via `schtasks`, no admin)
 
-## Architecture (planned module layout under `src/`)
+## Architecture (module layout under `src/`)
 
-- `index.ts` — entry point, commander CLI wiring
-- `daemon.ts` — background process: timer loop, skip detection, drives the dialog
-- `dialog.ts` — native dialog, branches on `process.platform`: macOS uses `osascript` `display dialog`, Windows uses a PowerShell InputBox
-- `storage.ts` — read/write the JSONL log
-- `report.ts` — interpret raw records into a human report
-- `config.ts` — load/manage config
+- `index.ts` — entry point, commander CLI wiring; also exposes a hidden `__daemon` subcommand the detached child runs
+- `types.ts` — shared data model: `ActivityStatus`, `ActivityRecord`, `Config`, and the report-only `RenderStatus`/`ReportSlot`
+- `config.ts` — paths under `~/.atracker/`, `DEFAULT_CONFIG`, `loadConfig`
+- `daemon.ts` — background loop: timer → dialog → storage, with drift/gap realignment (no backfill)
+- `dialog.ts` — native dialog, branches on `process.platform`: macOS uses `osascript` `display dialog`, Windows uses a PowerShell InputBox; any failure degrades to `timeout`
+- `storage.ts` — read/write the JSONL log (the only file-touching module for activities)
+- `report.ts` — interpret raw records into a human report (carry-forward, gap-filling, weekly grouping)
+- `process.ts` — daemon lifecycle: `startDaemon`/`stopDaemon` and the double-start guard; owns `process.json`
+- `install.ts` — autostart registration (macOS LaunchAgent, Windows schtasks)
 
 Data flow: `timer → skip-interval check → dialog.ts → user answers/dismisses → storage.ts → activities.jsonl`.
 
