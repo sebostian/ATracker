@@ -99,16 +99,26 @@ async function askWindows(config: Config, timestamp: string): Promise<ActivityRe
   const q = escapePowerShell(config.question);
   // InputBox has no built-in timeout, so we enforce it by killing the process.
   // It returns "" for both Cancel and an empty OK — both count as dismissed.
+  //
+  // Two encoding safeguards keep Cyrillic intact:
+  //   - `[Console]::OutputEncoding = UTF8` makes the typed answer come back as
+  //     UTF-8 bytes; without it PowerShell emits the active OEM code page and
+  //     Cyrillic turns into literal "????" before Node can read it.
+  //   - The whole script is passed as a UTF-16LE Base64 blob via
+  //     `-EncodedCommand`, so the question survives the command line regardless
+  //     of the console code page.
   const script = [
+    `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`,
     `Add-Type -AssemblyName Microsoft.VisualBasic`,
     `$r = [Microsoft.VisualBasic.Interaction]::InputBox('${q}','ATracker','')`,
     `[Console]::Out.Write($r)`,
   ].join("; ");
+  const encoded = Buffer.from(script, "utf16le").toString("base64");
 
   const timeoutMs = config.dialogTimeoutMinutes * 60_000;
   const { stdout, timedOut } = await run(
     "powershell",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
+    ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
     timeoutMs,
   );
   if (timedOut) return { timestamp, status: "timeout" };
