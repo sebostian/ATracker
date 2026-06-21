@@ -13,9 +13,32 @@
 import { spawn } from "node:child_process";
 import type { ActivityRecord, Config } from "./types.js";
 
+/** The interval the dialog is asking about: `[start, end]`. */
+export interface Period {
+  start: Date;
+  end: Date;
+}
+
 interface RunResult {
   stdout: string;
   timedOut: boolean;
+}
+
+/** Local `HH:MM:SS` for a Date, in the machine's timezone. */
+function formatTime(d: Date): string {
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
+/**
+ * The full dialog text: the configured question, plus a concrete time range so
+ * the user knows exactly which slice of the day is being asked about.
+ */
+function composeQuestion(config: Config, period?: Period): string {
+  if (!period) return config.question;
+  return `${config.question}\n(с ${formatTime(period.start)} по ${formatTime(period.end)})`;
 }
 
 /**
@@ -69,9 +92,9 @@ function escapePowerShell(s: string): string {
   return s.replace(/'/g, "''");
 }
 
-async function askMac(config: Config, timestamp: string): Promise<ActivityRecord> {
+async function askMac(config: Config, question: string, timestamp: string): Promise<ActivityRecord> {
   const seconds = config.dialogTimeoutMinutes * 60;
-  const q = escapeAppleScript(config.question);
+  const q = escapeAppleScript(question);
   // The script normalises every outcome to a single stdout token so we don't
   // depend on the order of AppleScript record fields. Cancel raises -128, which
   // we catch and report as DISMISSED (keeping the exit code 0).
@@ -95,8 +118,8 @@ async function askMac(config: Config, timestamp: string): Promise<ActivityRecord
   return { timestamp, status: "timeout" };
 }
 
-async function askWindows(config: Config, timestamp: string): Promise<ActivityRecord> {
-  const q = escapePowerShell(config.question);
+async function askWindows(config: Config, question: string, timestamp: string): Promise<ActivityRecord> {
+  const q = escapePowerShell(question);
   // InputBox has no built-in timeout, so we enforce it by killing the process.
   // It returns "" for both Cancel and an empty OK — both count as dismissed.
   //
@@ -130,11 +153,12 @@ async function askWindows(config: Config, timestamp: string): Promise<ActivityRe
  * Show the dialog and resolve to a record. Any failure to display it (missing
  * permissions, headless session, unsupported platform) degrades to `timeout`.
  */
-export async function askActivity(config: Config): Promise<ActivityRecord> {
+export async function askActivity(config: Config, period?: Period): Promise<ActivityRecord> {
   const timestamp = new Date().toISOString();
+  const question = composeQuestion(config, period);
   try {
-    if (process.platform === "darwin") return await askMac(config, timestamp);
-    if (process.platform === "win32") return await askWindows(config, timestamp);
+    if (process.platform === "darwin") return await askMac(config, question, timestamp);
+    if (process.platform === "win32") return await askWindows(config, question, timestamp);
     return { timestamp, status: "timeout" };
   } catch {
     return { timestamp, status: "timeout" };

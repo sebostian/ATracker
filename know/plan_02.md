@@ -63,7 +63,9 @@ build it first so everything else can depend on it.
 
 - Path helper: `~/.atracker/` resolved via `os.homedir()`; export `dataDir`, `configPath`,
   `processPath`, `activitiesPath`.
-- `DEFAULT_CONFIG` = `{ intervalMinutes: 60, dialogTimeoutMinutes: 10, question: "Что ты делал последний час?" }`.
+- `DEFAULT_CONFIG` = `{ intervalMinutes: 60, dialogTimeoutMinutes: 10, question: "Чем ты занимался?" }`.
+  (Originally `"Что ты делал последний час?"`; shortened once the dialog began appending the
+  concrete period — see the Post-implementation changes addendum.)
 - `loadConfig()`: ensure dir exists (`fs.mkdirSync(..., { recursive: true })`); if
   `config.json` missing, write defaults and return them; else parse and merge over defaults
   (so new fields get defaults).
@@ -118,13 +120,17 @@ carries previous forward without persisting; timeout label; gap inserted when
 
 **Why:** the only OS-specific surface; branch on `process.platform` and degrade gracefully.
 
-- `askActivity(config): Promise<ActivityRecord>` returning a record with status
-  `answered`/`dismissed`/`timeout`.
+- `askActivity(config, period?): Promise<ActivityRecord>` returning a record with status
+  `answered`/`dismissed`/`timeout`. `period` is `{ start: Date; end: Date }`; when present,
+  `composeQuestion` appends a concrete range to the question (`\n(с HH:MM:SS по HH:MM:SS)`)
+  so the user knows exactly which slice is being asked about — see the addendum.
 - **macOS**: `osascript -e 'display dialog ...'` with `giving up after <timeout>`; parse
   `text returned:` for answer, detect cancel button → `dismissed`, "gave up:true" → `timeout`.
 - **Windows**: PowerShell `InputBox` (`Microsoft.VisualBasic.Interaction::InputBox`); empty/
   cancel → `dismissed`. Enforce timeout by killing the child after
-  `dialogTimeoutMinutes` → `timeout`.
+  `dialogTimeoutMinutes` → `timeout`. **Encoding:** force `[Console]::OutputEncoding = UTF8`
+  and pass the script via `-EncodedCommand` (UTF-16LE Base64) so Cyrillic round-trips instead
+  of becoming `????` — see the addendum.
 - Any spawn error / non-zero exit (no perms, headless) → record `timeout`.
 - Use `child_process.execFile`/`spawn` with a timeout guard.
 
@@ -137,8 +143,9 @@ answering, cancelling, and letting it time out yield the three statuses respecti
 
 **Why:** the long-running loop that ties timer → skip detection → dialog → storage.
 
-- `runDaemon()`: loop — on each tick call `dialog.askActivity`, `storage.appendRecord` the
-  result, then schedule the next tick at `intervalMinutes`.
+- `runDaemon()`: loop — on each tick compute the interval that just ended
+  (`{ start: now - interval, end: now }`), call `dialog.askActivity(config, period)`,
+  `storage.appendRecord` the result, then schedule the next tick at `intervalMinutes`.
 - On startup and each tick, compute drift; if `delta > interval × 1.5` since last expected
   fire, treat the gap as machine-unavailable (don't backfill records — the gap is inferred at
   report time per Step 4).
@@ -214,3 +221,46 @@ the spec.
    in `config.json` to test quickly); answer it, confirm a record lands in the JSONL;
    `node dist/index.js stop` removes `process.json`.
 5. `npm link` → `atracker --help` works as a global binary.
+
+---
+
+## Post-implementation changes
+
+Changes made after Steps 0–10 were merged. They refine the dialog only; storage, report, and
+the four-state model are untouched.
+
+### A. Windows Cyrillic corruption fix (`src/dialog.ts`)
+
+**Symptom:** on Windows, Russian answers were saved as `????` in `activities.jsonl`.
+
+**Cause:** PowerShell emitted the typed answer through the active OEM code page (e.g. CP866/
+CP1251), not UTF-8. Characters it couldn't represent were replaced with literal `?` *inside
+PowerShell, before Node read the bytes* — so `storage.ts` faithfully persisted already-broken
+text.
+
+**Fix (`askWindows`):**
+- Prepend `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` so the answer comes back
+  as UTF-8 bytes (Node's default `.toString()` then decodes it correctly).
+- Pass the whole script as a UTF-16LE Base64 blob via `-EncodedCommand` (instead of
+  `-Command`), so the Cyrillic *question* also survives the command line regardless of the
+  console code page.
+
+macOS (`osascript`) is already UTF-8 and was left unchanged.
+
+### B. Show the asked period in the dialog (`src/dialog.ts`, `src/daemon.ts`, `src/config.ts`)
+
+**Goal:** the dialog should name the concrete interval it asks about, e.g.
+`(с 13:05:20 по 14:05:20)`, not just a generic "last hour".
+
+**Changes:**
+- `src/dialog.ts`: add `Period { start: Date; end: Date }`, a `formatTime` helper (local
+  `HH:MM:SS`), and `composeQuestion(config, period?)` that appends `\n(с … по …)` to
+  `config.question`. `askActivity` gains an optional `period` argument and threads the composed
+  text through both platform paths.
+- `src/daemon.ts`: each tick passes `{ start: now - intervalMs, end: now }` — the interval that
+  just ended.
+- `src/config.ts`: default `question` shortened from `"Что ты делал последний час?"` to
+  `"Чем ты занимался?"` (the period now conveys the timeframe). Existing `~/.atracker/config.json`
+  files keep their own `question`; they were updated manually.
+
+`README.md` was updated to match (intro + config table).

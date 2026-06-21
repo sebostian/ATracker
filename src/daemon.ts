@@ -42,7 +42,10 @@ export async function runDaemon(): Promise<void> {
 
   const tick = async (): Promise<void> => {
     try {
-      appendRecord(await askActivity(config));
+      // The dialog asks about the interval that just ended: [now - interval, now].
+      const end = new Date();
+      const start = new Date(end.getTime() - intervalMs);
+      appendRecord(await askActivity(config, { start, end }));
     } catch {
       // A single failed tick must never kill the loop.
     }

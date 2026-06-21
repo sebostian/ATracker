@@ -23,7 +23,7 @@ export const activitiesPath = path.join(dataDir, "activities.jsonl");
 export const DEFAULT_CONFIG: Config = {
   intervalMinutes: 60,
   dialogTimeoutMinutes: 10,
-  question: "Что ты делал последний час?",
+  question: "Чем ты занимался?",
 };
 
 /** Create `~/.atracker/` if it doesn't exist. */
