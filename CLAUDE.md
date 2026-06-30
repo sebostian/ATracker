@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Plans
 
-Save all plans in the `know/` folder (e.g. `know/plan_02.md`), following the existing `know/plan_01.md`.
+Save all plans in the `know/` folder. The consolidated design spec, build plan, and change log live in `know/plan.md`.
 
 ## Project status
 
-The CLI is **implemented** (Steps 0–10 of `know/plan_02.md`). Source lives under `src/`, with unit tests in `tests/`. The original Russian design spec is `know/plan_01.md` and the phased build plan is `know/plan_02.md` — both remain the source of truth for intended behaviour.
+The CLI is **implemented** (Steps 0–10 of `know/plan.md`). Source lives under `src/`, with unit tests in `tests/`. `know/plan.md` is the consolidated source of truth: the Russian design spec (Part I), the phased build plan (Part II), post-implementation changes (Part III), and the `uninstall` feature + verification (Part IV).
 
 ## Build & test
 
