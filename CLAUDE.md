@@ -31,6 +31,7 @@ The only runtime dependency is `commander` (CLI); everything else uses Node buil
 - `atracker log "text" [--time 13:00]` — manual entry, `--time` backdates it
 - `atracker report [--date YYYY-MM-DD | --week]` — today / specific date / last 7 days
 - `atracker install` — register autostart (macOS LaunchAgent via `launchctl`; Windows task via `schtasks`, no admin)
+- `atracker uninstall` — remove autostart registration (inverse of `install`; leaves `~/.atracker/` and the daemon untouched)
 
 ## Architecture (module layout under `src/`)
 
@@ -42,7 +43,7 @@ The only runtime dependency is `commander` (CLI); everything else uses Node buil
 - `storage.ts` — read/write the JSONL log (the only file-touching module for activities)
 - `report.ts` — interpret raw records into a human report (carry-forward, gap-filling, weekly grouping)
 - `process.ts` — daemon lifecycle: `startDaemon`/`stopDaemon` and the double-start guard; owns `process.json`
-- `install.ts` — autostart registration (macOS LaunchAgent, Windows schtasks)
+- `install.ts` — autostart registration and removal (macOS LaunchAgent, Windows schtasks)
 
 Data flow: `timer → skip-interval check → dialog.ts → user answers/dismisses → storage.ts → activities.jsonl`.
 

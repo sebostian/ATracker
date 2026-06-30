@@ -86,3 +86,46 @@ export function installAutostart(): void {
   if (process.platform === "win32") return installWindows(node, entry);
   console.error("Автозапуск поддерживается только на macOS и Windows.");
 }
+
+function uninstallMac(): void {
+  const plistPath = path.join(
+    os.homedir(),
+    "Library",
+    "LaunchAgents",
+    `${LABEL}.plist`,
+  );
+
+  if (!fs.existsSync(plistPath)) {
+    console.log("Автозапуск не установлен.");
+    return;
+  }
+
+  try {
+    execFileSync("launchctl", ["unload", plistPath], { stdio: "ignore" });
+  } catch {
+    // Wasn't loaded — fine, still remove the file below.
+  }
+  fs.rmSync(plistPath, { force: true });
+
+  console.log("Автозапуск удалён.");
+}
+
+function uninstallWindows(): void {
+  try {
+    execFileSync("schtasks", ["/delete", "/tn", TASK_NAME, "/f"], {
+      stdio: "ignore",
+    });
+  } catch {
+    console.log("Автозапуск не установлен.");
+    return;
+  }
+
+  console.log("Автозапуск удалён.");
+}
+
+/** Remove autostart registration for the current platform. */
+export function uninstallAutostart(): void {
+  if (process.platform === "darwin") return uninstallMac();
+  if (process.platform === "win32") return uninstallWindows();
+  console.error("Автозапуск поддерживается только на macOS и Windows.");
+}
