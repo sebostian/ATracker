@@ -18,6 +18,8 @@ The CLI is **implemented** (Steps 0–10 of `know/plan.md`). Source lives under 
 - `npm test` — run unit tests (`node:test` via `tsx`); tests live in **`tests/`**, never alongside `src/`.
 - `npm link` — expose the global `atracker` binary.
 
+Requires Node ≥20 (`engines` in `package.json`); the project is ESM (`"type": "module"`).
+
 ## What ATracker is
 
 A small cross-platform (macOS + Windows) CLI that runs as a detached background process. Once per interval it pops a **native OS dialog** asking "Что ты делал последний час?" ("What were you doing the last hour?"), appends the answer to a log, and can render a daily/weekly report of where time went.
@@ -62,9 +64,18 @@ This is the crux of the whole app. Each record carries a `timestamp` and a `stat
 - `timeout` — dialog shown but ignored until `dialogTimeoutMinutes` elapsed and it auto-closed. A dialog that fails to launch (no permissions, headless) is also recorded as `timeout`.
 - **no record at all** — computer was asleep/off or the tracker wasn't running. Detected when actual fire time exceeds expected by `delta > interval × 1.5`; reports render these slots as "отсутствует ← компьютер спал". Missing hours are never written; they are inferred only when building the report.
 
-When changing report output or storage, preserve this separation: storage records raw facts (only the three explicit statuses are ever persisted), and all interpretation/carry-forward/gap-filling happens in `report.ts`.
+**IMPORTANT:** When changing report output or storage, preserve this separation: storage records raw facts (only the three explicit statuses are ever persisted), and all interpretation/carry-forward/gap-filling happens in `report.ts`.
+
+## Code style
+
+No linter or formatter is configured (no ESLint/Prettier). TypeScript runs in `strict` mode — match the existing formatting and naming conventions by hand when editing.
+
+## Git
+
+All work lands directly on `main` — no branches, no PRs. Commit subjects are short and imperative (e.g. `Add dialog.ts`, `Fix Cyrillic answer corruption on Windows`).
 
 ## Conventions
 
 - The spec and dialog/report strings are in Russian; match existing language for user-facing text.
 - Background process is created with `{ detached: true, stdio: "ignore" }` followed by `child.unref()`.
+- `dialog.ts` and `install.ts` contain Windows-only code paths (PowerShell InputBox, `schtasks`) that can't be exercised on a macOS dev machine — reason carefully about their behavior rather than assuming local test runs cover them.
